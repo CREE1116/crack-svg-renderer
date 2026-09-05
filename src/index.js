@@ -29,7 +29,8 @@ export default {
     try {
       const url = new URL(request.url);
       const path = url.pathname.replace(/\/+$/, "").replace(/\.(svg|webp|png|jpe?g)$/i, "") || "/";
-      const imageBase = env.IMAGE_BASE || DEFAULT_IMAGE_BASE;
+      const rawBase = url.searchParams.get("b") || url.searchParams.get("base") || env.IMAGE_BASE || DEFAULT_IMAGE_BASE;
+      const imageBase = resolveBase(rawBase);
 
       let svg;
 
@@ -160,6 +161,15 @@ function textResponse(text, status = 200) {
     status,
     headers: { "Content-Type": "text/plain; charset=utf-8" }
   });
+}
+
+function resolveBase(base = "") {
+  base = String(base || "").trim();
+  if (!base) return DEFAULT_IMAGE_BASE;
+  if (!/^https?:\/\//i.test(base)) {
+    base = "https://" + base;
+  }
+  return base.replace(/\/+$/, "") + "/";
 }
 
 function esc(value = "") {
