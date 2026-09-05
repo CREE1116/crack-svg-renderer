@@ -1,6 +1,8 @@
 const DEFAULT_IMAGE_BASE = "https://baal-corp.pages.dev/";
 
-const FONT_FAMILY = "-apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Pretendard', 'Malgun Gothic', 'Noto Sans KR', sans-serif";
+const FONT_FAMILY = "'Pretendard', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif";
+const FONT_SERIF = "'Noto Serif KR', 'Nanum Myeongjo', 'AppleMyungjo', 'KoPubWorldBatang', 'BatangChe', serif";
+const FONT_CINZEL = "'Cinzel', 'Playfair Display', 'Didot', 'Georgia', 'Times New Roman', serif";
 
 const COLORS = {
   dark: "#111216",
@@ -237,39 +239,52 @@ async function renderCard(url, imageBase, ctx) {
   const rawImg = imageUrl(imageBase, q(url, "i"));
   const imgData = await fetchImageAsDataUrl(rawImg, ctx);
 
-  const name = esc(clampText(q(url, "n", "UNKNOWN"), 22));
-  const position = esc(clampText(q(url, "p"), 36));
-  const relation = esc(clampText(q(url, "r"), 40));
+  const name = esc(clampText(q(url, "n", "UNKNOWN"), 16));
+  const position = esc(clampText(q(url, "p"), 28));
+  const relation = esc(clampText(q(url, "r"), 32));
+
+  // 폰트 스타일: 기본적으로 감성적인 명조/세리프와 고딕의 황금 밸런스 적용
+  const fontMode = q(url, "font", q(url, "ft", "serif")).toLowerCase();
+  const isSans = fontMode === "sans" || fontMode === "gothic";
+  const titleFont = isSans ? FONT_FAMILY : FONT_SERIF;
 
   return `
 <svg
   xmlns="http://www.w3.org/2000/svg"
   xmlns:xlink="http://www.w3.org/1999/xlink"
-  viewBox="0 0 1200 540"
-  width="1200"
+  viewBox="0 0 960 540"
+  width="960"
   height="540"
 >
   <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&amp;family=Noto+Serif+KR:wght@600;800;900&amp;family=Playfair+Display:wght@700;900&amp;display=swap');
+      text {
+        text-rendering: optimizeLegibility;
+        -webkit-font-smoothing: antialiased;
+      }
+    </style>
+
     <!-- 1:1 SQUARE PHOTO CLIP (540 x 540) -->
     <clipPath id="card-photo">
       <rect x="0" y="0" width="540" height="540" />
     </clipPath>
 
-    <!-- RIGHT EDGE SMOOTH BLACK FADE -->
+    <!-- SMOOTH COMPACT BLACK FADE -->
     <linearGradient id="card-fade" x1="0" y1="0" x2="1" y2="0">
       <stop offset="0%" stop-color="${COLORS.dark}" stop-opacity="0" />
-      <stop offset="60%" stop-color="${COLORS.dark}" stop-opacity="0.65" />
+      <stop offset="50%" stop-color="${COLORS.dark}" stop-opacity="0.5" />
       <stop offset="100%" stop-color="${COLORS.dark}" stop-opacity="1" />
     </linearGradient>
 
     <linearGradient id="card-bottom" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="65%" stop-color="#000" stop-opacity="0" />
-      <stop offset="100%" stop-color="#000" stop-opacity=".35" />
+      <stop offset="70%" stop-color="#000" stop-opacity="0" />
+      <stop offset="100%" stop-color="#000" stop-opacity=".4" />
     </linearGradient>
   </defs>
 
   <!-- BASE DARK BACKGROUND -->
-  <rect width="1200" height="540" fill="${COLORS.dark}" />
+  <rect width="960" height="540" fill="${COLORS.dark}" />
 
   <!-- 1:1 PHOTO (LEFT) -->
   ${imgData ? `
@@ -294,58 +309,60 @@ async function renderCard(url, imageBase, ctx) {
   <rect x="0" y="0" width="540" height="540" fill="url(#card-bottom)" clip-path="url(#card-photo)" />
 
   <!-- RIGHT EDGE FADE OVERLAY -->
-  <rect x="340" y="0" width="205" height="540" fill="url(#card-fade)" />
+  <rect x="360" y="0" width="185" height="540" fill="url(#card-fade)" />
 
-  <!-- VERTICAL ACCENT DIVIDER -->
-  <rect x="565" y="90" width="2" height="360" fill="#FFFFFF" opacity=".12" />
+  <!-- VERTICAL ACCENT LINE -->
+  <rect x="536" y="95" width="2" height="350" fill="#FFFFFF" opacity=".14" />
 
-  <!-- NAME (RIGHT AREA) -->
+  <!-- NAME (ELEGANT TITLE) -->
   <text
-    x="605"
-    y="172"
+    x="570"
+    y="182"
     fill="${COLORS.white}"
-    font-family="${FONT_FAMILY}"
-    font-size="64"
+    font-family="${titleFont}"
+    font-size="56"
     font-weight="800"
-    letter-spacing="-1"
+    letter-spacing="${isSans ? '-1' : '1'}"
   >${name}</text>
 
   <!-- POSITION -->
   <text
-    x="610"
-    y="228"
+    x="572"
+    y="236"
     fill="${COLORS.muted}"
     font-family="${FONT_FAMILY}"
-    font-size="23"
+    font-size="20"
     font-weight="400"
+    letter-spacing="1"
   >${position}</text>
 
-  <!-- SUBTLE DIVIDER LINE -->
-  <rect x="610" y="268" width="60" height="2" fill="#FFFFFF" opacity=".20" />
+  <!-- SUBTLE ACCENT LINE -->
+  <rect x="572" y="274" width="45" height="2" fill="${COLORS.red}" opacity=".85" />
 
-  <!-- RELATION LABEL -->
+  <!-- RELATION LABEL (LUXURY CINZEL) -->
   <text
-    x="610"
-    y="336"
+    x="572"
+    y="342"
     fill="${COLORS.muted2}"
-    font-family="${FONT_FAMILY}"
-    font-size="13"
-    font-weight="700"
-    letter-spacing="4"
+    font-family="${FONT_CINZEL}"
+    font-size="12"
+    font-weight="900"
+    letter-spacing="5"
   >RELATION</text>
 
   <!-- RELATION -->
   <text
-    x="610"
-    y="386"
+    x="572"
+    y="388"
     fill="${COLORS.white}"
-    font-family="${FONT_FAMILY}"
-    font-size="28"
+    font-family="${titleFont}"
+    font-size="25"
     font-weight="600"
+    letter-spacing="${isSans ? '0' : '1'}"
   >${relation}</text>
 
-  <!-- BOTTOM ACCENT -->
-  <rect x="610" y="432" width="48" height="3" fill="${COLORS.red}" rx="1.5" />
+  <!-- BOTTOM SUBTLE ACCENT -->
+  <rect x="572" y="428" width="32" height="2" fill="#FFFFFF" opacity=".3" />
 </svg>
 `.trim();
 }
