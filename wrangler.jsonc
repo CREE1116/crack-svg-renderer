@@ -1,0 +1,11 @@
+{
+  "name": "crack-svg-renderer",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "vars": {
+    "IMAGE_BASE": "https://YOUR-IMAGE-CDN.example/"
+  }
+}
