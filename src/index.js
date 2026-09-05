@@ -780,17 +780,13 @@ async function renderRelation(url, imageBase, ctx) {
     const img = isDefault ? "" : imageUrl(imageBase, rawImg);
     people.push({ id, name, img, imgData: "" });
 
-    // p 파라미터 내의 4번째, 5번째 필드로 중심과의 관계선 자동 등록
-    // p=코드~이름~표정~중심향라벨~외곽향라벨
-    const toCenterLabel = cleanLabel(parts[3]);
-    const fromCenterLabel = cleanLabel(parts[4]);
+    // p 파라미터 내의 4번째 필드로 중심과의 관계선 등록 (선당 관계 1개)
+    // p=코드~이름~이미지~관계
+    const relToCenter = cleanLabel(parts[3]);
     const centerTarget = userPerson ? userPerson.id : "user";
 
-    if (toCenterLabel) {
-      autoRelations.push({ from: id, to: centerTarget, label: toCenterLabel });
-    }
-    if (fromCenterLabel) {
-      autoRelations.push({ from: centerTarget, to: id, label: fromCenterLabel });
+    if (relToCenter) {
+      autoRelations.push({ from: id, to: centerTarget, label: relToCenter });
     }
   }
 
@@ -811,7 +807,7 @@ async function renderRelation(url, imageBase, ctx) {
     throw new Error("No people supplied");
   }
 
-  // 3) 관계선(Relations / Links) 파싱: l 및 r 파라미터 지원 (세미콜론 및 쉼표 구분)
+  // 3) 관계선(Relations / Links) 파싱: l=A~B~관계 (선당 관계 1개)
   const rawLinks = [
     ...url.searchParams.getAll("l"),
     ...url.searchParams.getAll("link"),
@@ -820,25 +816,19 @@ async function renderRelation(url, imageBase, ctx) {
   ].flatMap(r => r.split(/[;,]/)).map(s => s.trim()).filter(Boolean);
 
   const manualRelations = [];
-  for (const row of rawLinks.slice(0, 20)) {
+  for (const row of rawLinks.slice(0, 25)) {
     const parts = row.split("~").map(s => s.trim());
     let from = parts[0] || "";
     let to = parts[1] || "";
-    // "u" 나 "user" 로 적힌 경우 중심 인물의 실제 id로 치환
     if ((from === "u" || from === "user") && focus) from = focus.id;
     if ((to === "u" || to === "user") && focus) to = focus.id;
 
     if (!from || !to) continue;
 
-    // 양방향 l=A~B~AtoB~BtoA 지원
-    if (parts.length >= 4) {
-      const l1 = cleanLabel(parts[2]);
-      const l2 = cleanLabel(parts[3]);
-      if (l1) manualRelations.push({ from, to, label: l1 });
-      if (l2) manualRelations.push({ from: to, to: from, label: l2 });
-    } else if (parts[2]) {
-      const l1 = cleanLabel(parts[2]);
-      if (l1) manualRelations.push({ from, to, label: l1 });
+    // 선당 관계 이름 1개: parts[2]
+    const relLabel = cleanLabel(parts[2]);
+    if (relLabel) {
+      manualRelations.push({ from, to, label: relLabel });
     }
   }
 
@@ -1108,12 +1098,12 @@ function renderRelationEdges(rawRelations, positions) {
     const isCenterInvolved = a.isFocus || b.isFocus;
 
     if (isCenterInvolved) {
-      // [중심-외곽 관계선]: 시원하게 중심과 외곽을 직접 잇는 선
+      // [중심-외곽 관계선]: 선 1개, 중앙(54%)에 라벨 1개
       const center = a.isFocus ? a : b;
       const outer = a.isFocus ? b : a;
 
       const points = shortenLine(center.x, center.y, outer.x, outer.y, center.size / 2 + 8, outer.size / 2 + 10);
-      const visual1 = relationVisual(rel1.label);
+      const visual = relationVisual(rel1.label);
 
       output.push(`
 <line
@@ -1121,41 +1111,22 @@ function renderRelationEdges(rawRelations, positions) {
   y1="${points.y1}"
   x2="${points.x2}"
   y2="${points.y2}"
-  stroke="${visual1.stroke}"
-  stroke-width="${visual1.width}"
+  stroke="${visual.stroke}"
+  stroke-width="${visual.width}"
   stroke-linecap="round"
-  ${visual1.dash ? `stroke-dasharray="${visual1.dash}"` : ""}
-  opacity="${visual1.opacity}"
+  ${visual.dash ? `stroke-dasharray="${visual.dash}"` : ""}
+  opacity="${visual.opacity}"
 />
       `.trim());
 
-      if (!rel2) {
-        // 단방향: 58% 외곽 지점
-        const lx = points.x1 + (points.x2 - points.x1) * 0.58;
-        const ly = points.y1 + (points.y2 - points.y1) * 0.58;
-        output.push(renderLabelBadge(lx, ly, rel1.label, visual1));
-      } else {
-        // 양방향: 중심쪽 38%, 외곽쪽 68%로 분리 배치 (절대 안 겹침!)
-        const visual2 = relationVisual(rel2.label);
-        const p1FromCenter = rel1.from === center.id;
-
-        const t1 = p1FromCenter ? 0.38 : 0.68;
-        const t2 = p1FromCenter ? 0.68 : 0.38;
-
-        const lx1 = points.x1 + (points.x2 - points.x1) * t1;
-        const ly1 = points.y1 + (points.y2 - points.y1) * t1;
-        const lx2 = points.x1 + (points.x2 - points.x1) * t2;
-        const ly2 = points.y1 + (points.y2 - points.y1) * t2;
-
-        output.push(renderLabelBadge(lx1, ly1, rel1.label, visual1));
-        output.push(renderLabelBadge(lx2, ly2, rel2.label, visual2));
-      }
+      const lx = points.x1 + (points.x2 - points.x1) * 0.54;
+      const ly = points.y1 + (points.y2 - points.y1) * 0.54;
+      output.push(renderLabelBadge(lx, ly, rel1.label, visual));
     } else {
-      // [외곽-외곽 관계선]: 인물 사이를 가로지르며 드라마틱하게 교차하는 선!
+      // [외곽-외곽 관계선]: 인물 사이를 가로지르며 교차하는 선, 중앙(50%)에 라벨 1개
       const points = shortenLine(a.x, a.y, b.x, b.y, a.size / 2 + 8, b.size / 2 + 8);
-      const visual1 = relationVisual(rel1.label);
+      const visual = relationVisual(rel1.label);
 
-      // 중심과의 거리로 텐션(곡률) 조절: 너무 평평하지 않게 부드럽게 얽힘
       const mx = (points.x1 + points.x2) / 2;
       const my = (points.y1 + points.y2) / 2;
       const dxCenter = mx - 500;
@@ -1171,34 +1142,18 @@ function renderRelationEdges(rawRelations, positions) {
 <path
   d="M ${points.x1} ${points.y1} Q ${cx} ${cy}, ${points.x2} ${points.y2}"
   fill="none"
-  stroke="${visual1.stroke}"
-  stroke-width="${visual1.width}"
+  stroke="${visual.stroke}"
+  stroke-width="${visual.width}"
   stroke-linecap="round"
-  ${visual1.dash ? `stroke-dasharray="${visual1.dash}"` : ""}
-  opacity="${visual1.opacity}"
+  ${visual.dash ? `stroke-dasharray="${visual.dash}"` : ""}
+  opacity="${visual.opacity}"
 />
       `.trim());
 
-      if (!rel2) {
-        // 단방향: 곡선 중앙 50% 지점
-        const lx = 0.25 * points.x1 + 0.5 * cx + 0.25 * points.x2;
-        const ly = 0.25 * points.y1 + 0.5 * cy + 0.25 * points.y2;
-        output.push(renderLabelBadge(lx, ly, rel1.label, visual1));
-      } else {
-        // 양방향: 곡선 위 34% 지점과 66% 지점에 각각 배치!
-        const visual2 = relationVisual(rel2.label);
-
-        const t1 = 0.34;
-        const lx1 = (1 - t1) * (1 - t1) * points.x1 + 2 * (1 - t1) * t1 * cx + t1 * t1 * points.x2;
-        const ly1 = (1 - t1) * (1 - t1) * points.y1 + 2 * (1 - t1) * t1 * cy + t1 * t1 * points.y2;
-
-        const t2 = 0.66;
-        const lx2 = (1 - t2) * (1 - t2) * points.x1 + 2 * (1 - t2) * t2 * cx + t2 * t2 * points.x2;
-        const ly2 = (1 - t2) * (1 - t2) * points.y1 + 2 * (1 - t2) * t2 * cy + t2 * t2 * points.y2;
-
-        output.push(renderLabelBadge(lx1, ly1, rel1.label, visual1));
-        output.push(renderLabelBadge(lx2, ly2, rel2.label, visual2));
-      }
+      // 곡선 중앙 50% 지점에 라벨 1개
+      const lx = 0.25 * points.x1 + 0.5 * cx + 0.25 * points.x2;
+      const ly = 0.25 * points.y1 + 0.5 * cy + 0.25 * points.y2;
+      output.push(renderLabelBadge(lx, ly, rel1.label, visual));
     }
   }
 
