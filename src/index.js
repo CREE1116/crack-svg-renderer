@@ -1,4 +1,4 @@
-const DEFAULT_IMAGE_BASE = "https://YOUR-IMAGE-CDN.example/";
+const DEFAULT_IMAGE_BASE = "https://baal-corp.pages.dev/";
 
 const FONT_FAMILY = "-apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Pretendard', 'Malgun Gothic', 'Noto Sans KR', sans-serif";
 

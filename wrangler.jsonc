@@ -6,6 +6,6 @@
     "nodejs_compat"
   ],
   "vars": {
-    "IMAGE_BASE": "https://YOUR-IMAGE-CDN.example/"
+    "IMAGE_BASE": "https://baal-corp.pages.dev/"
   }
 }
