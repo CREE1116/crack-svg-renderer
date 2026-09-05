@@ -164,13 +164,20 @@ function esc(value = "") {
     .replaceAll("'", "&apos;");
 }
 
-function cleanImageId(id = "") {
-  id = String(id).trim();
+function imageUrl(base, id) {
+  id = String(id || "").trim();
+  if (!id) return "";
 
+  // 1) 이미 풀 URL(http:// 또는 https://)인 경우 그대로 허용
   if (/^https?:\/\//i.test(id)) {
-    throw new Error("Full image URLs are not allowed");
+    // XSS 방지를 위한 기본 태그 문자 제거
+    if (id.includes("<") || id.includes(">") || id.includes('"')) {
+      throw new Error("Invalid characters in image URL");
+    }
+    return id;
   }
 
+  // 2) 상대 경로/식별자인 경우 traversal 방지 후 base와 결합
   if (
     id.startsWith("//") ||
     id.includes("..") ||
@@ -181,13 +188,7 @@ function cleanImageId(id = "") {
     throw new Error("Invalid image identifier");
   }
 
-  return id.replace(/^\/+/, "");
-}
-
-function imageUrl(base, id) {
-  id = cleanImageId(id);
-  if (!id) return "";
-  return base.replace(/\/+$/, "") + "/" + id;
+  return base.replace(/\/+$/, "") + "/" + id.replace(/^\/+/, "");
 }
 
 function q(url, name, fallback = "") {
