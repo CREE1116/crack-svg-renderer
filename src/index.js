@@ -26,7 +26,7 @@ export default {
   async fetch(request, env, ctx) {
     try {
       const url = new URL(request.url);
-      const path = url.pathname.replace(/\/+$/, "") || "/";
+      const path = url.pathname.replace(/\/+$/, "").replace(/\.(svg|webp|png|jpe?g)$/i, "") || "/";
       const imageBase = env.IMAGE_BASE || DEFAULT_IMAGE_BASE;
 
       let svg;
@@ -197,7 +197,11 @@ function imageUrl(base, id) {
 }
 
 function q(url, name, fallback = "") {
-  return url.searchParams.get(name) ?? fallback;
+  let val = url.searchParams.get(name) ?? fallback;
+  if (name !== "i" && name !== "p") {
+    val = String(val).replace(/\.(webp|png|jpe?g|svg)$/i, "").trim();
+  }
+  return val;
 }
 
 function clampText(text, max) {
