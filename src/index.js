@@ -1053,20 +1053,35 @@ function renderRelationEdges(relations, positions) {
 }
 
 function relationVisual(label) {
-  label = String(label || "");
-  if (label.includes("연인") || label.includes("사랑")) {
-    return { stroke: "#B55368", width: 5, opacity: 0.82, dash: "" };
+  label = String(label || "").toLowerCase();
+
+  // 1) 핑크: 연인, 사랑, 호감, 애정
+  if (label.includes("연인") || label.includes("사랑") || label.includes("호감") || label.includes("애정") || label.includes("pink")) {
+    return { stroke: "#E05275", width: 4.5, opacity: 0.88, dash: "" };
   }
-  if (label.includes("적대") || label.includes("원수")) {
-    return { stroke: "#3C3D41", width: 5, opacity: 0.88, dash: "10 7" };
+
+  // 2) 블루: 동료, 협력, 조력, 우정, 신뢰
+  if (label.includes("동료") || label.includes("협력") || label.includes("조력") || label.includes("우정") || label.includes("신뢰") || label.includes("blue")) {
+    return { stroke: "#2563EB", width: 3.5, opacity: 0.82, dash: "" };
   }
-  if (label.includes("경계") || label.includes("의심")) {
-    return { stroke: "#777A80", width: 3, opacity: 0.72, dash: "5 7" };
+
+  // 3) 그린: 사수, 가족, 스승, 멘토
+  if (label.includes("사수") || label.includes("가족") || label.includes("스승") || label.includes("멘토") || label.includes("green")) {
+    return { stroke: "#059669", width: 3.5, opacity: 0.82, dash: "" };
   }
-  if (label.includes("가족")) {
-    return { stroke: "#5A6C65", width: 5, opacity: 0.76, dash: "" };
+
+  // 4) 오렌지 점선: 경계, 의심, 경쟁, 갈등, 주의
+  if (label.includes("경계") || label.includes("의심") || label.includes("경쟁") || label.includes("갈등") || label.includes("주의") || label.includes("orange")) {
+    return { stroke: "#D97706", width: 3.5, opacity: 0.85, dash: "6 5" };
   }
-  return { stroke: "#8E9197", width: 3, opacity: 0.62, dash: "" };
+
+  // 5) 블랙 굵은 점선: 적대, 원수, 배신, 증오, 라이벌
+  if (label.includes("적대") || label.includes("원수") || label.includes("배신") || label.includes("증오") || label.includes("라이벌") || label.includes("black")) {
+    return { stroke: "#1E1F24", width: 4.5, opacity: 0.95, dash: "9 6" };
+  }
+
+  // 6) 기본 그레이 실선: 중립, 계약, 비즈니스 등
+  return { stroke: "#94A3B8", width: 2.5, opacity: 0.65, dash: "" };
 }
 
 function shortenLine(x1, y1, x2, y2, startGap, endGap) {
