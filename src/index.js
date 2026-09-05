@@ -237,9 +237,9 @@ async function renderCard(url, imageBase, ctx) {
   const rawImg = imageUrl(imageBase, q(url, "i"));
   const imgData = await fetchImageAsDataUrl(rawImg, ctx);
 
-  const name = esc(clampText(q(url, "n", "UNKNOWN"), 18));
-  const position = esc(clampText(q(url, "p"), 30));
-  const relation = esc(clampText(q(url, "r"), 34));
+  const name = esc(clampText(q(url, "n", "UNKNOWN"), 22));
+  const position = esc(clampText(q(url, "p"), 36));
+  const relation = esc(clampText(q(url, "r"), 40));
 
   return `
 <svg
@@ -250,95 +250,102 @@ async function renderCard(url, imageBase, ctx) {
   height="540"
 >
   <defs>
+    <!-- 1:1 SQUARE PHOTO CLIP (540 x 540) -->
     <clipPath id="card-photo">
-      <rect x="0" y="0" width="940" height="540" />
+      <rect x="0" y="0" width="540" height="540" />
     </clipPath>
 
+    <!-- RIGHT EDGE SMOOTH BLACK FADE -->
     <linearGradient id="card-fade" x1="0" y1="0" x2="1" y2="0">
       <stop offset="0%" stop-color="${COLORS.dark}" stop-opacity="0" />
-      <stop offset="55%" stop-color="${COLORS.dark}" stop-opacity="0.24" />
+      <stop offset="60%" stop-color="${COLORS.dark}" stop-opacity="0.65" />
       <stop offset="100%" stop-color="${COLORS.dark}" stop-opacity="1" />
     </linearGradient>
 
     <linearGradient id="card-bottom" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="55%" stop-color="#000" stop-opacity="0" />
-      <stop offset="100%" stop-color="#000" stop-opacity=".20" />
+      <stop offset="65%" stop-color="#000" stop-opacity="0" />
+      <stop offset="100%" stop-color="#000" stop-opacity=".35" />
     </linearGradient>
   </defs>
 
-  <!-- BASE -->
+  <!-- BASE DARK BACKGROUND -->
   <rect width="1200" height="540" fill="${COLORS.dark}" />
 
-  <!-- IMAGE OR DEFAULT SILHOUETTE -->
+  <!-- 1:1 PHOTO (LEFT) -->
   ${imgData ? `
   <image
     href="${imgData}"
     xlink:href="${imgData}"
     x="0"
     y="0"
-    width="940"
+    width="540"
     height="540"
     preserveAspectRatio="xMidYMid slice"
     clip-path="url(#card-photo)"
   />
   ` : `
-  <rect x="0" y="0" width="940" height="540" fill="#181A20" clip-path="url(#card-photo)" />
-  <circle cx="450" cy="220" r="95" fill="#282C37" />
-  <path d="M 230 540 C 260 370, 640 370, 670 540 Z" fill="#282C37" clip-path="url(#card-photo)" />
+  <!-- DEFAULT SILHOUETTE FOR 1:1 SQUARE -->
+  <rect x="0" y="0" width="540" height="540" fill="#181A20" clip-path="url(#card-photo)" />
+  <circle cx="270" cy="210" r="95" fill="#282C37" />
+  <path d="M 120 540 C 140 370, 400 370, 420 540 Z" fill="#282C37" clip-path="url(#card-photo)" />
   `}
 
-  <rect x="0" y="0" width="940" height="540" fill="url(#card-bottom)" />
+  <!-- BOTTOM SHADOW ON PHOTO -->
+  <rect x="0" y="0" width="540" height="540" fill="url(#card-bottom)" clip-path="url(#card-photo)" />
 
-  <!-- FADE TO TEXT -->
-  <rect x="590" y="0" width="400" height="540" fill="url(#card-fade)" />
+  <!-- RIGHT EDGE FADE OVERLAY -->
+  <rect x="340" y="0" width="205" height="540" fill="url(#card-fade)" />
 
-  <!-- SUBTLE VERTICAL DETAIL -->
-  <rect x="824" y="116" width="2" height="310" fill="#FFFFFF" opacity=".12" />
+  <!-- VERTICAL ACCENT DIVIDER -->
+  <rect x="565" y="90" width="2" height="360" fill="#FFFFFF" opacity=".12" />
 
-  <!-- NAME -->
+  <!-- NAME (RIGHT AREA) -->
   <text
-    x="865"
-    y="190"
+    x="605"
+    y="172"
     fill="${COLORS.white}"
     font-family="${FONT_FAMILY}"
-    font-size="61"
-    font-weight="700"
+    font-size="64"
+    font-weight="800"
     letter-spacing="-1"
   >${name}</text>
 
   <!-- POSITION -->
   <text
-    x="870"
-    y="236"
+    x="610"
+    y="228"
     fill="${COLORS.muted}"
     font-family="${FONT_FAMILY}"
-    font-size="21"
+    font-size="23"
     font-weight="400"
   >${position}</text>
 
+  <!-- SUBTLE DIVIDER LINE -->
+  <rect x="610" y="268" width="60" height="2" fill="#FFFFFF" opacity=".20" />
+
   <!-- RELATION LABEL -->
   <text
-    x="870"
-    y="332"
+    x="610"
+    y="336"
     fill="${COLORS.muted2}"
     font-family="${FONT_FAMILY}"
-    font-size="12"
+    font-size="13"
     font-weight="700"
     letter-spacing="4"
   >RELATION</text>
 
   <!-- RELATION -->
   <text
-    x="870"
-    y="378"
+    x="610"
+    y="386"
     fill="${COLORS.white}"
     font-family="${FONT_FAMILY}"
-    font-size="27"
-    font-weight="500"
+    font-size="28"
+    font-weight="600"
   >${relation}</text>
 
   <!-- BOTTOM ACCENT -->
-  <rect x="870" y="422" width="42" height="3" fill="${COLORS.white}" opacity=".88" />
+  <rect x="610" y="432" width="48" height="3" fill="${COLORS.red}" rx="1.5" />
 </svg>
 `.trim();
 }
