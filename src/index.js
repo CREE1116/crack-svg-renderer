@@ -269,7 +269,7 @@ async function renderCard(url, imageBase, ctx) {
   <!-- BASE -->
   <rect width="1200" height="540" fill="${COLORS.dark}" />
 
-  <!-- IMAGE -->
+  <!-- IMAGE OR DEFAULT SILHOUETTE -->
   ${imgData ? `
   <image
     href="${imgData}"
@@ -281,7 +281,11 @@ async function renderCard(url, imageBase, ctx) {
     preserveAspectRatio="xMidYMid slice"
     clip-path="url(#card-photo)"
   />
-  ` : ''}
+  ` : `
+  <rect x="0" y="0" width="940" height="540" fill="#181A20" clip-path="url(#card-photo)" />
+  <circle cx="450" cy="220" r="95" fill="#282C37" />
+  <path d="M 230 540 C 260 370, 640 370, 670 540 Z" fill="#282C37" clip-path="url(#card-photo)" />
+  `}
 
   <rect x="0" y="0" width="940" height="540" fill="url(#card-bottom)" />
 
@@ -557,7 +561,11 @@ async function renderWanted(url, imageBase, ctx) {
     filter="url(#wanted-desat)"
     clip-path="url(#wanted-photo)"
   />
-  ` : ''}
+  ` : `
+  <circle cx="480" cy="440" r="85" fill="#B0ADA5" clip-path="url(#wanted-photo)" />
+  <path d="M 280 720 C 310 560, 650 560, 680 720 Z" fill="#B0ADA5" clip-path="url(#wanted-photo)" />
+  <text x="480" y="475" text-anchor="middle" fill="${COLORS.ink}" font-family="${FONT_FAMILY}" font-size="20" font-weight="700" letter-spacing="3" opacity=".5">NO PHOTOGRAPH</text>
+  `}
 
   <!-- NAME -->
   <text
@@ -732,7 +740,9 @@ function parsePeople(raw, imageBase) {
       const parts = row.split("~");
       const id = clampText(parts[0] || "", 24);
       const name = clampText(parts[1] || id, 16);
-      const img = imageUrl(imageBase, parts[2] || "");
+      const rawImg = (parts[2] || "").trim();
+      const isDefault = !rawImg || /^(none|default|user|null|no)$/i.test(rawImg);
+      const img = isDefault ? "" : imageUrl(imageBase, rawImg);
       return { id, name, img, imgData: "" };
     })
     .filter(x => x.id);
@@ -811,7 +821,7 @@ function renderRelationNode(person, pos, focus) {
     filter="url(#node-shadow)"
   />
 
-  <!-- IMAGE (BASE64) -->
+  <!-- IMAGE OR DEFAULT USER AVATAR -->
   ${person.imgData ? `
   <image
     href="${person.imgData}"
@@ -823,7 +833,27 @@ function renderRelationNode(person, pos, focus) {
     preserveAspectRatio="xMidYMid slice"
     clip-path="url(#clip-${safeId})"
   />
-  ` : ''}
+  ` : `
+  <rect
+    x="${x}"
+    y="${y}"
+    width="${size}"
+    height="${size}"
+    rx="${radius}"
+    fill="${focus ? '#21242C' : '#353842'}"
+  />
+  <circle
+    cx="${pos.x}"
+    cy="${pos.y - size * 0.12}"
+    r="${size * 0.22}"
+    fill="${focus ? '#4F5568' : '#5E6476'}"
+  />
+  <path
+    d="M ${pos.x - size * 0.38} ${pos.y + size * 0.44} C ${pos.x - size * 0.32} ${pos.y + size * 0.08}, ${pos.x + size * 0.32} ${pos.y + size * 0.08}, ${pos.x + size * 0.38} ${pos.y + size * 0.44} Z"
+    fill="${focus ? '#4F5568' : '#5E6476'}"
+    clip-path="url(#clip-${safeId})"
+  />
+  `}
 
   <!-- BORDER -->
   <rect
