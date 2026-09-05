@@ -768,22 +768,23 @@ function parseRelations(raw) {
 
 function buildRelationPositions(focus, others) {
   const map = new Map();
-  map.set(focus.id, { x: 500, y: 500, size: 154 });
+  map.set(focus.id, { x: 500, y: 500, size: 140, isFocus: true });
 
-  const slots = [
-    [500, 205],
-    [735, 280],
-    [795, 500],
-    [735, 720],
-    [500, 790],
-    [265, 720],
-    [205, 500],
-    [265, 280]
-  ];
+  const count = others.length;
+  const radius = 320;
 
   others.forEach((person, index) => {
-    const slot = slots[index];
-    map.set(person.id, { x: slot[0], y: slot[1], size: 112 });
+    // 12시 방향부터 시계방향으로 균등 원형 배치
+    const angle = -Math.PI / 2 + (index * 2 * Math.PI / count);
+    const x = Math.round(500 + radius * Math.cos(angle));
+    const y = Math.round(500 + radius * Math.sin(angle));
+    map.set(person.id, {
+      x,
+      y,
+      size: 104,
+      isFocus: false,
+      angle
+    });
   });
 
   return map;
@@ -799,8 +800,11 @@ function renderRelationNode(person, pos, focus) {
   const radius = focus ? 28 : 22;
   const border = focus ? "#17181B" : "#FFFFFF";
   const borderWidth = focus ? 4 : 3;
-  const nameSize = focus ? 25 : 19;
+  const nameSize = focus ? 22 : 17;
   const safeId = safeSvgId(person.id);
+
+  // 이름표 너비: 글자 길이에 맞춰 동적 조절
+  const nameWidth = Math.max(90, Math.min(130, person.name.length * 16 + 28));
 
   return `
 <g>
@@ -810,13 +814,13 @@ function renderRelationNode(person, pos, focus) {
     </clipPath>
   </defs>
 
-  <!-- WHITE CARD -->
+  <!-- WHITE CARD SHADOW -->
   <rect
-    x="${x - 6}"
-    y="${y - 6}"
-    width="${size + 12}"
-    height="${size + 12}"
-    rx="${radius + 5}"
+    x="${x - 5}"
+    y="${y - 5}"
+    width="${size + 10}"
+    height="${size + 10}"
+    rx="${radius + 4}"
     fill="#FFFFFF"
     filter="url(#node-shadow)"
   />
@@ -869,22 +873,25 @@ function renderRelationNode(person, pos, focus) {
 
   <!-- NAME PLATE -->
   <rect
-    x="${pos.x - 62}"
-    y="${y + size + 18}"
-    width="124"
-    height="${focus ? 40 : 34}"
-    rx="${focus ? 20 : 17}"
+    x="${pos.x - nameWidth / 2}"
+    y="${y + size + 10}"
+    width="${nameWidth}"
+    height="${focus ? 36 : 30}"
+    rx="${focus ? 18 : 15}"
     fill="#FFFFFF"
+    stroke="#17181B"
+    stroke-width="1"
+    stroke-opacity=".12"
   />
 
   <text
     x="${pos.x}"
-    y="${y + size + (focus ? 46 : 42)}"
+    y="${y + size + (focus ? 34 : 30)}"
     text-anchor="middle"
     fill="#17181B"
     font-family="${FONT_FAMILY}"
     font-size="${nameSize}"
-    font-weight="${focus ? 700 : 600}"
+    font-weight="${focus ? 800 : 700}"
   >${esc(person.name)}</text>
 </g>
 `.trim();
@@ -896,13 +903,21 @@ function renderRelationEdges(relations, positions) {
     const b = positions.get(rel.to);
     if (!a || !b) return "";
 
-    const points = shortenLine(a.x, a.y, b.x, b.y, a.size / 2 + 15, b.size / 2 + 15);
-    const mx = (points.x1 + points.x2) / 2;
-    const my = (points.y1 + points.y2) / 2;
+    const isCenterInvolved = a.isFocus || b.isFocus;
     const visual = relationVisual(rel.label);
-    const width = Math.max(60, Math.min(122, rel.label.length * 18 + 30));
+    const width = Math.max(54, Math.min(110, rel.label.length * 15 + 24));
 
-    return `
+    if (isCenterInvolved) {
+      // 중심-주변 연결: 라벨을 바깥쪽 58% 지점으로 배치하여 중심부 겹침 완전 방지
+      const center = a.isFocus ? a : b;
+      const outer = a.isFocus ? b : a;
+
+      const points = shortenLine(center.x, center.y, outer.x, outer.y, center.size / 2 + 10, outer.size / 2 + 12);
+
+      const lx = points.x1 + (points.x2 - points.x1) * 0.58;
+      const ly = points.y1 + (points.y2 - points.y1) * 0.58;
+
+      return `
 <g>
   <line
     x1="${points.x1}"
@@ -917,28 +932,80 @@ function renderRelationEdges(relations, positions) {
   />
 
   <rect
-    x="${mx - width / 2}"
-    y="${my - 17}"
+    x="${lx - width / 2}"
+    y="${ly - 14}"
     width="${width}"
-    height="34"
-    rx="17"
-    fill="#F1F0EC"
-    stroke="#17181B"
-    stroke-width="1"
-    stroke-opacity=".10"
+    height="28"
+    rx="14"
+    fill="#FFFFFF"
+    stroke="${visual.stroke}"
+    stroke-width="1.5"
+    stroke-opacity=".5"
   />
 
   <text
-    x="${mx}"
-    y="${my + 6}"
+    x="${lx}"
+    y="${ly + 5}"
     text-anchor="middle"
-    fill="#34363B"
+    fill="#202228"
     font-family="${FONT_FAMILY}"
-    font-size="15"
-    font-weight="600"
+    font-size="13"
+    font-weight="700"
   >${esc(rel.label)}</text>
 </g>
 `.trim();
+    } else {
+      // 주변-주변 연결: 중심을 가로지르지 않고 바깥쪽으로 부드럽게 휘어지는 베지어 곡선
+      const points = shortenLine(a.x, a.y, b.x, b.y, a.size / 2 + 10, b.size / 2 + 10);
+      const mx = (points.x1 + points.x2) / 2;
+      const my = (points.y1 + points.y2) / 2;
+
+      const dxCenter = mx - 500;
+      const dyCenter = my - 500;
+      const distCenter = Math.sqrt(dxCenter * dxCenter + dyCenter * dyCenter) || 1;
+      const bend = 60;
+      const cx = mx + (dxCenter / distCenter) * bend;
+      const cy = my + (dyCenter / distCenter) * bend;
+
+      const lx = 0.25 * points.x1 + 0.5 * cx + 0.25 * points.x2;
+      const ly = 0.25 * points.y1 + 0.5 * cy + 0.25 * points.y2;
+
+      return `
+<g>
+  <path
+    d="M ${points.x1} ${points.y1} Q ${cx} ${cy}, ${points.x2} ${points.y2}"
+    fill="none"
+    stroke="${visual.stroke}"
+    stroke-width="${visual.width}"
+    stroke-linecap="round"
+    ${visual.dash ? `stroke-dasharray="${visual.dash}"` : ""}
+    opacity="${visual.opacity}"
+  />
+
+  <rect
+    x="${lx - width / 2}"
+    y="${ly - 14}"
+    width="${width}"
+    height="28"
+    rx="14"
+    fill="#FFFFFF"
+    stroke="${visual.stroke}"
+    stroke-width="1.5"
+    stroke-opacity=".5"
+  />
+
+  <text
+    x="${lx}"
+    y="${ly + 5}"
+    text-anchor="middle"
+    fill="#202228"
+    font-family="${FONT_FAMILY}"
+    font-size="13"
+    font-weight="700"
+  >${esc(rel.label)}</text>
+</g>
+`.trim();
+    }
   }).join("\n");
 }
 
