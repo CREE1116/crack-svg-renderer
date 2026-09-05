@@ -401,6 +401,8 @@ async function renderNews(url, imageBase, ctx) {
   const head2 = esc(head2Raw);
   const sub = esc(clampText(q(url, "s"), 45));
 
+  const isGray = q(url, "gray") === "1" || q(url, "mono") === "1";
+
   return `
 <svg
   xmlns="http://www.w3.org/2000/svg"
@@ -410,6 +412,7 @@ async function renderNews(url, imageBase, ctx) {
   height="720"
 >
   <defs>
+    ${isGray ? `
     <filter id="news-gray">
       <feColorMatrix
         type="matrix"
@@ -421,6 +424,7 @@ async function renderNews(url, imageBase, ctx) {
         "
       />
     </filter>
+    ` : ""}
 
     <linearGradient id="news-shadow" x1="0" y1="0" x2="0" y2="1">
       <stop offset="45%" stop-color="#000000" stop-opacity="0" />
@@ -440,7 +444,7 @@ async function renderNews(url, imageBase, ctx) {
     width="1316"
     height="740"
     preserveAspectRatio="xMidYMid slice"
-    filter="url(#news-gray)"
+    ${isGray ? 'filter="url(#news-gray)"' : ""}
   />
   ` : ''}
 
@@ -705,25 +709,119 @@ async function renderWanted(url, imageBase, ctx) {
 // ============================================================
 
 async function renderRelation(url, imageBase, ctx) {
-  const focusId = q(url, "f");
-  const people = parsePeople(q(url, "p"), imageBase);
+  // 1) 중심 인물(Focus / User) 파싱: u=코드~이름~표정 지원
+  const rawUser = url.searchParams.get("u") || url.searchParams.get("user") || url.searchParams.get("focus");
+  let userPerson = null;
+  if (rawUser) {
+    const parts = rawUser.split("~").map(s => s.trim());
+    let id = parts[0] || "user";
+    if (id === "none") id = "user";
+    const name = parts[1] || (id === "user" ? "YOU" : id);
+    let rawImg = parts[2] || "";
+    const isDefault = !rawImg || /^(none|default|user|null|no)$/i.test(rawImg);
+    if (!isDefault && !rawImg.includes("/") && id !== "user" && id !== "none") {
+      rawImg = `${id}/${rawImg}`;
+    }
+    const img = isDefault ? "" : imageUrl(imageBase, rawImg);
+    userPerson = { id, name, img, imgData: "" };
+  }
 
-  if (!people.length) {
+  // 2) 주변 인물들(People) 파싱: p 파라미터 다중(getAll) 및 세미콜론 지원
+  const rawPeoples = [
+    ...url.searchParams.getAll("p"),
+    ...url.searchParams.getAll("people")
+  ].flatMap(p => p.split(";")).map(s => s.trim()).filter(Boolean);
+
+  const autoRelations = [];
+  const people = [];
+
+  for (const row of rawPeoples.slice(0, 9)) {
+    const parts = row.split("~").map(s => s.trim());
+    const id = clampText(parts[0] || "", 24);
+    if (!id) continue;
+    const name = clampText(parts[1] || id, 16);
+    let rawImg = (parts[2] || "").trim();
+    const isDefault = !rawImg || /^(none|default|user|null|no)$/i.test(rawImg);
+
+    // 캐릭터 코드(id)와 표정 코드(rawImg) 자동 조합 (예: 06 + s02 -> 06/s02)
+    if (!isDefault && !rawImg.includes("/") && id !== "user" && id !== "none") {
+      rawImg = `${id}/${rawImg}`;
+    }
+
+    const img = isDefault ? "" : imageUrl(imageBase, rawImg);
+    people.push({ id, name, img, imgData: "" });
+
+    // p 파라미터 내의 4번째, 5번째 필드로 중심과의 관계선 자동 등록
+    // p=코드~이름~표정~중심향라벨~외곽향라벨
+    const toCenterLabel = clampText(parts[3] || "", 12);
+    const fromCenterLabel = clampText(parts[4] || "", 12);
+    const centerTarget = userPerson ? userPerson.id : "user";
+
+    if (toCenterLabel) {
+      autoRelations.push({ from: id, to: centerTarget, label: toCenterLabel });
+    }
+    if (fromCenterLabel) {
+      autoRelations.push({ from: centerTarget, to: id, label: fromCenterLabel });
+    }
+  }
+
+  // 중심 인물 결정: userPerson이 있으면 맨 앞에 두고 focus로 삼음
+  let allPeople = [];
+  let focus = null;
+
+  if (userPerson) {
+    focus = userPerson;
+    allPeople = [userPerson, ...people.filter(p => p.id !== userPerson.id)];
+  } else {
+    const focusId = q(url, "f");
+    focus = people.find(p => p.id === focusId) || people[0];
+    allPeople = people;
+  }
+
+  if (!allPeople.length) {
     throw new Error("No people supplied");
   }
 
+  // 3) 관계선(Relations / Links) 파싱: l 및 r 파라미터 지원
+  const rawLinks = [
+    ...url.searchParams.getAll("l"),
+    ...url.searchParams.getAll("link"),
+    ...url.searchParams.getAll("r"),
+    ...url.searchParams.getAll("relation")
+  ].flatMap(r => r.split(";")).map(s => s.trim()).filter(Boolean);
+
+  const manualRelations = [];
+  for (const row of rawLinks.slice(0, 20)) {
+    const parts = row.split("~").map(s => s.trim());
+    let from = parts[0] || "";
+    let to = parts[1] || "";
+    // "u" 나 "user" 로 적힌 경우 중심 인물의 실제 id로 치환
+    if ((from === "u" || from === "user") && focus) from = focus.id;
+    if ((to === "u" || to === "user") && focus) to = focus.id;
+
+    if (!from || !to) continue;
+
+    // 양방향 l=A~B~AtoB~BtoA 지원
+    if (parts.length >= 4) {
+      if (parts[2]) manualRelations.push({ from, to, label: clampText(parts[2], 12) });
+      if (parts[3]) manualRelations.push({ from: to, to: from, label: clampText(parts[3], 12) });
+    } else if (parts[2]) {
+      manualRelations.push({ from, to, label: clampText(parts[2], 12) });
+    }
+  }
+
+  const relations = [...autoRelations, ...manualRelations];
+
   // 병렬로 인물들의 이미지를 Base64 Data URL로 로드
   await Promise.all(
-    people.map(async (person) => {
+    allPeople.map(async (person) => {
       if (person.img) {
         person.imgData = await fetchImageAsDataUrl(person.img, ctx);
       }
     })
   );
 
-  const focus = people.find(p => p.id === focusId) || people[0];
-  const others = people.filter(p => p.id !== focus.id).slice(0, 8);
-  const relations = parseRelations(q(url, "r"));
+  const others = allPeople.filter(p => p.id !== focus.id).slice(0, 8);
   const positions = buildRelationPositions(focus, others);
 
   const edgesSvg = renderRelationEdges(relations, positions);
@@ -740,8 +838,17 @@ async function renderRelation(url, imageBase, ctx) {
   viewBox="0 0 1000 1000"
   width="1000"
   height="1000"
+  shape-rendering="geometricPrecision"
+  text-rendering="geometricPrecision"
 >
   <defs>
+    <style>
+      image {
+        image-rendering: high-quality;
+        image-rendering: smooth;
+        image-rendering: optimizeQuality;
+      }
+    </style>
     <filter id="node-shadow" x="-30%" y="-30%" width="160%" height="160%">
       <feDropShadow dx="0" dy="7" stdDeviation="9" flood-color="#000000" flood-opacity=".24" />
     </filter>
@@ -772,49 +879,13 @@ async function renderRelation(url, imageBase, ctx) {
 `.trim();
 }
 
-function parsePeople(raw, imageBase) {
-  if (!raw) return [];
-  return raw
-    .split(";")
-    .map(row => row.trim())
-    .filter(Boolean)
-    .slice(0, 9)
-    .map(row => {
-      const parts = row.split("~");
-      const id = clampText(parts[0] || "", 24);
-      const name = clampText(parts[1] || id, 16);
-      const rawImg = (parts[2] || "").trim();
-      const isDefault = !rawImg || /^(none|default|user|null|no)$/i.test(rawImg);
-      const img = isDefault ? "" : imageUrl(imageBase, rawImg);
-      return { id, name, img, imgData: "" };
-    })
-    .filter(x => x.id);
-}
-
-function parseRelations(raw) {
-  if (!raw) return [];
-  return raw
-    .split(";")
-    .map(row => row.trim())
-    .filter(Boolean)
-    .slice(0, 20)
-    .map(row => {
-      const [from, to, label] = row.split("~");
-      return {
-        from: from || "",
-        to: to || "",
-        label: clampText(label || "", 12)
-      };
-    })
-    .filter(x => x.from && x.to);
-}
 
 function buildRelationPositions(focus, others) {
   const map = new Map();
-  map.set(focus.id, { x: 500, y: 500, size: 140, isFocus: true });
+  map.set(focus.id, { x: 500, y: 500, size: 164, isFocus: true });
 
   const count = others.length;
-  const radius = 320;
+  const radius = 330;
 
   others.forEach((person, index) => {
     // 12시 방향부터 시계방향으로 균등 원형 배치
@@ -824,7 +895,7 @@ function buildRelationPositions(focus, others) {
     map.set(person.id, {
       x,
       y,
-      size: 104,
+      size: 122,
       isFocus: false,
       angle
     });
@@ -840,14 +911,14 @@ function renderRelationNode(person, pos, focus) {
   const half = size / 2;
   const x = pos.x - half;
   const y = pos.y - half;
-  const radius = focus ? 28 : 22;
+  const radius = focus ? 32 : 24;
   const border = focus ? "#17181B" : "#FFFFFF";
   const borderWidth = focus ? 4 : 3;
   const nameSize = focus ? 22 : 17;
   const safeId = safeSvgId(person.id);
 
   // 이름표 너비: 글자 길이에 맞춰 동적 조절
-  const nameWidth = Math.max(90, Math.min(130, person.name.length * 16 + 28));
+  const nameWidth = Math.max(94, Math.min(136, person.name.length * 16 + 28));
 
   return `
 <g>
@@ -859,11 +930,11 @@ function renderRelationNode(person, pos, focus) {
 
   <!-- WHITE CARD SHADOW -->
   <rect
-    x="${x - 5}"
-    y="${y - 5}"
-    width="${size + 10}"
-    height="${size + 10}"
-    rx="${radius + 4}"
+    x="${x - 4}"
+    y="${y - 4}"
+    width="${size + 8}"
+    height="${size + 8}"
+    rx="${radius + 3}"
     fill="#FFFFFF"
     filter="url(#node-shadow)"
   />
@@ -879,6 +950,8 @@ function renderRelationNode(person, pos, focus) {
     height="${size}"
     preserveAspectRatio="xMidYMid slice"
     clip-path="url(#clip-${safeId})"
+    image-rendering="optimizeQuality"
+    style="image-rendering: high-quality; image-rendering: smooth;"
   />
   ` : `
   <rect
