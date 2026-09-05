@@ -168,27 +168,32 @@ function imageUrl(base, id) {
   id = String(id || "").trim();
   if (!id) return "";
 
-  // 1) 이미 풀 URL(http:// 또는 https://)인 경우 그대로 허용
+  // XSS 및 태그 주입 방지
+  if (id.includes("<") || id.includes(">") || id.includes('"') || id.includes("'")) {
+    throw new Error("Invalid characters in image identifier");
+  }
+
+  // 1) 이미 http:// 또는 https:// 가 붙어있는 경우 그대로 사용
   if (/^https?:\/\//i.test(id)) {
-    // XSS 방지를 위한 기본 태그 문자 제거
-    if (id.includes("<") || id.includes(">") || id.includes('"')) {
-      throw new Error("Invalid characters in image URL");
-    }
     return id;
   }
 
-  // 2) 상대 경로/식별자인 경우 traversal 방지 후 base와 결합
-  if (
-    id.startsWith("//") ||
-    id.includes("..") ||
-    id.includes("\\") ||
-    id.includes("<") ||
-    id.includes(">")
-  ) {
-    throw new Error("Invalid image identifier");
+  // 2) https:// 떼고 도메인부터 들어온 경우 (예: "i.imgur.com/abc.webp", "cdn.discordapp.com/...")
+  //    첫 번째 슬래시 앞부분에 점(.)이 포함되어 있으면 도메인으로 인식하여 https:// 자동 부착
+  const clean = id.replace(/^\/+/, "");
+  const firstSlash = clean.indexOf("/");
+  const hostPart = firstSlash !== -1 ? clean.slice(0, firstSlash) : clean;
+
+  if (hostPart.includes(".") && !hostPart.startsWith(".") && !hostPart.endsWith(".")) {
+    return "https://" + clean;
   }
 
-  return base.replace(/\/+$/, "") + "/" + id.replace(/^\/+/, "");
+  // 3) 순수 상대 경로/식별자인 경우 (예: "char/lime.webp") -> IMAGE_BASE 와 결합
+  if (clean.includes("..") || clean.includes("\\")) {
+    throw new Error("Invalid image path");
+  }
+
+  return base.replace(/\/+$/, "") + "/" + clean;
 }
 
 function q(url, name, fallback = "") {
