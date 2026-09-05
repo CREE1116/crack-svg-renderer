@@ -260,7 +260,18 @@ async function renderCard(url, imageBase, ctx) {
 
   const name = esc(clampText(q(url, "n", "UNKNOWN"), 16));
   const position = esc(clampText(q(url, "p"), 28));
-  const relation = esc(clampText(q(url, "r"), 32));
+
+  // 사용자가 l 또는 label 로 헤더 제목(예: 종족, 이능, SPECIES, ABILITY)을 지정할 수 있음
+  const rawLabel = q(url, "l") || q(url, "label") || q(url, "k") || q(url, "title") ||
+    (q(url, "a") ? "ABILITY" : (q(url, "s") ? "SPECIES" : "SPECIES / ABILITY"));
+  const labelHeader = esc(clampText(rawLabel, 20));
+
+  // 라벨 내용 값 (r, a, s, t 파라미터 모두 호환)
+  const labelValue = esc(clampText(q(url, "r") || q(url, "a") || q(url, "s") || q(url, "t") || q(url, "v"), 32));
+
+  // 라벨 헤더 한글 여부에 따른 폰트 분기
+  const isKoreanLabel = /[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/.test(labelHeader);
+  const labelFont = isKoreanLabel ? FONT_FAMILY : FONT_CINZEL;
 
   // 폰트 스타일: 기본적으로 감성적인 명조/세리프와 고딕의 황금 밸런스 적용
   const fontMode = q(url, "font", q(url, "ft", "serif")).toLowerCase();
@@ -274,6 +285,8 @@ async function renderCard(url, imageBase, ctx) {
   viewBox="0 0 960 540"
   width="960"
   height="540"
+  shape-rendering="geometricPrecision"
+  text-rendering="geometricPrecision"
 >
   <defs>
     <style>
@@ -281,6 +294,11 @@ async function renderCard(url, imageBase, ctx) {
       text {
         text-rendering: optimizeLegibility;
         -webkit-font-smoothing: antialiased;
+      }
+      image {
+        image-rendering: high-quality;
+        image-rendering: smooth;
+        image-rendering: optimizeQuality;
       }
     </style>
 
@@ -316,6 +334,8 @@ async function renderCard(url, imageBase, ctx) {
     height="540"
     preserveAspectRatio="xMidYMid slice"
     clip-path="url(#card-photo)"
+    image-rendering="optimizeQuality"
+    style="image-rendering: high-quality; image-rendering: smooth;"
   />
   ` : `
   <!-- DEFAULT SILHOUETTE FOR 1:1 SQUARE -->
@@ -358,18 +378,18 @@ async function renderCard(url, imageBase, ctx) {
   <!-- SUBTLE ACCENT LINE -->
   <rect x="572" y="274" width="45" height="2" fill="${COLORS.red}" opacity=".85" />
 
-  <!-- RELATION LABEL (LUXURY CINZEL) -->
+  <!-- TRAIT / ABILITY / SPECIES LABEL -->
   <text
     x="572"
     y="342"
     fill="${COLORS.muted2}"
-    font-family="${FONT_CINZEL}"
-    font-size="12"
+    font-family="${labelFont}"
+    font-size="${isKoreanLabel ? 14 : 12}"
     font-weight="900"
-    letter-spacing="5"
-  >RELATION</text>
+    letter-spacing="${isKoreanLabel ? 2 : 4}"
+  >${labelHeader}</text>
 
-  <!-- RELATION -->
+  <!-- TRAIT / ABILITY / SPECIES VALUE -->
   <text
     x="572"
     y="388"
@@ -378,7 +398,7 @@ async function renderCard(url, imageBase, ctx) {
     font-size="25"
     font-weight="600"
     letter-spacing="${isSans ? '0' : '1'}"
-  >${relation}</text>
+  >${labelValue}</text>
 
   <!-- BOTTOM SUBTLE ACCENT -->
   <rect x="572" y="428" width="32" height="2" fill="#FFFFFF" opacity=".3" />
