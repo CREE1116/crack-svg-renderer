@@ -129,7 +129,12 @@ async function fetchImageAsDataUrl(imgUrl, ctx) {
       }
     }
 
-    const mime = res.headers.get("content-type") || "image/webp";
+    const mime = (res.headers.get("content-type") || "").toLowerCase();
+    // HTML 페이지(SPA 404 폴백) 등 이미지가 아닌 응답 필터링
+    if (!mime.startsWith("image/")) {
+      return "";
+    }
+
     const arrayBuffer = await res.arrayBuffer();
 
     let binary = "";
@@ -175,13 +180,17 @@ function imageUrl(base, id) {
     throw new Error("Invalid characters in image identifier");
   }
 
+  // 확장자가 생략된 경우 자동으로 .webp 부착 (예: "06/s01" -> "06/s01.webp")
+  if (!/\.(webp|png|jpe?g|svg|gif)$/i.test(id)) {
+    id = id + ".webp";
+  }
+
   // 1) 이미 http:// 또는 https:// 가 붙어있는 경우 그대로 사용
   if (/^https?:\/\//i.test(id)) {
     return id;
   }
 
-  // 2) https:// 떼고 도메인부터 들어온 경우 (예: "i.imgur.com/abc.webp", "cdn.discordapp.com/...")
-  //    첫 번째 슬래시 앞부분에 점(.)이 포함되어 있으면 도메인으로 인식하여 https:// 자동 부착
+  // 2) https:// 떼고 도메인부터 들어온 경우 (예: "baal-corp.pages.dev/06/s01.webp")
   const clean = id.replace(/^\/+/, "");
   const firstSlash = clean.indexOf("/");
   const hostPart = firstSlash !== -1 ? clean.slice(0, firstSlash) : clean;
@@ -190,7 +199,7 @@ function imageUrl(base, id) {
     return "https://" + clean;
   }
 
-  // 3) 순수 상대 경로/식별자인 경우 (예: "char/lime.webp") -> IMAGE_BASE 와 결합
+  // 3) 순수 상대 경로/식별자인 경우 (예: "06/s01.webp") -> IMAGE_BASE 와 결합
   if (clean.includes("..") || clean.includes("\\")) {
     throw new Error("Invalid image path");
   }
