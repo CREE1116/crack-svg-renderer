@@ -1,6 +1,6 @@
 const DEFAULT_IMAGE_BASE = "https://YOUR-IMAGE-CDN.example/";
 
-const FONT_FAMILY = '-apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Malgun Gothic", "Noto Sans KR", sans-serif';
+const FONT_FAMILY = "-apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Pretendard', 'Malgun Gothic', 'Noto Sans KR', sans-serif";
 
 const COLORS = {
   dark: "#111216",
