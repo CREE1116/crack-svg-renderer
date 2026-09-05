@@ -51,22 +51,22 @@ npx wrangler deploy
 
 ### 1. 명함 (`/c`)
 ```markdown
-![라임](https://<worker-domain>/c?i=char/lime.webp&n=라임&p=상품기획팀+선임&r=이종민의+사수+·+연인)
+![라임](https://crack-svg-renderer.leejongmin774.workers.dev/c?i=char/lime.webp&n=라임&p=상품기획팀+선임&r=이종민의+사수+·+연인)
 ```
 
 ### 2. 뉴스 (`/n`)
 ```markdown
-![뉴스](https://<worker-domain>/n?i=scene/limecry.webp&h=라임+선임,+회의+도중+결국+오열&s=사측+'업무와+무관')
+![뉴스](https://crack-svg-renderer.leejongmin774.workers.dev/n?i=scene/limecry.webp&h=라임+선임,+회의+도중+결국+오열&s=사측+'업무와+무관')
 ```
 
 ### 3. 현상수배 (`/w`)
 ```markdown
-![수배](https://<worker-domain>/w?i=char/lilith.webp&n=릴리스&o=기밀문서+탈취&d=S&w=5,000만+G)
+![수배](https://crack-svg-renderer.leejongmin774.workers.dev/w?i=char/lilith.webp&n=릴리스&o=기밀문서+탈취&d=S&w=5,000만+G)
 ```
 
 ### 4. 관계도 (`/g`)
 ```markdown
-![관계도](https://<worker-domain>/g?f=jm&p=jm~이종민~char/jm.webp;lime~라임~char/lime.webp;mona~모나~char/mona.webp&r=jm~lime~연인;jm~mona~동료)
+![관계도](https://crack-svg-renderer.leejongmin774.workers.dev/g?f=jm&p=jm~이종민~char/jm.webp;lime~라임~char/lime.webp;mona~모나~char/mona.webp&r=jm~lime~연인;jm~mona~동료)
 ```
 
 ---
