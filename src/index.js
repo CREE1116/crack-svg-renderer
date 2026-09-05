@@ -99,6 +99,13 @@ export default {
 async function fetchImageAsDataUrl(imgUrl, ctx) {
   if (!imgUrl) return "";
 
+  // 한글 경로 등 인코딩 안전화
+  try {
+    imgUrl = encodeURI(decodeURI(imgUrl));
+  } catch {
+    imgUrl = encodeURI(imgUrl);
+  }
+
   // Cloudflare Workers 에지 캐시 확인
   let cache;
   try {
@@ -746,11 +753,13 @@ async function renderRelation(url, imageBase, ctx) {
     userPerson = { id, name, img, imgData: "" };
   }
 
-  // 2) 주변 인물들(People) 파싱: p 파라미터 다중(getAll) 및 세미콜론 지원
+  const cleanLabel = (text) => clampText(String(text || "").split("#")[0].trim(), 12);
+
+  // 2) 주변 인물들(People) 파싱: p 파라미터 다중(getAll) 및 세미콜론/쉼표 지원
   const rawPeoples = [
     ...url.searchParams.getAll("p"),
     ...url.searchParams.getAll("people")
-  ].flatMap(p => p.split(";")).map(s => s.trim()).filter(Boolean);
+  ].flatMap(p => p.split(/[;,]/)).map(s => s.trim()).filter(Boolean);
 
   const autoRelations = [];
   const people = [];
@@ -773,8 +782,8 @@ async function renderRelation(url, imageBase, ctx) {
 
     // p 파라미터 내의 4번째, 5번째 필드로 중심과의 관계선 자동 등록
     // p=코드~이름~표정~중심향라벨~외곽향라벨
-    const toCenterLabel = clampText(parts[3] || "", 12);
-    const fromCenterLabel = clampText(parts[4] || "", 12);
+    const toCenterLabel = cleanLabel(parts[3]);
+    const fromCenterLabel = cleanLabel(parts[4]);
     const centerTarget = userPerson ? userPerson.id : "user";
 
     if (toCenterLabel) {
@@ -802,13 +811,13 @@ async function renderRelation(url, imageBase, ctx) {
     throw new Error("No people supplied");
   }
 
-  // 3) 관계선(Relations / Links) 파싱: l 및 r 파라미터 지원
+  // 3) 관계선(Relations / Links) 파싱: l 및 r 파라미터 지원 (세미콜론 및 쉼표 구분)
   const rawLinks = [
     ...url.searchParams.getAll("l"),
     ...url.searchParams.getAll("link"),
     ...url.searchParams.getAll("r"),
     ...url.searchParams.getAll("relation")
-  ].flatMap(r => r.split(";")).map(s => s.trim()).filter(Boolean);
+  ].flatMap(r => r.split(/[;,]/)).map(s => s.trim()).filter(Boolean);
 
   const manualRelations = [];
   for (const row of rawLinks.slice(0, 20)) {
@@ -823,10 +832,13 @@ async function renderRelation(url, imageBase, ctx) {
 
     // 양방향 l=A~B~AtoB~BtoA 지원
     if (parts.length >= 4) {
-      if (parts[2]) manualRelations.push({ from, to, label: clampText(parts[2], 12) });
-      if (parts[3]) manualRelations.push({ from: to, to: from, label: clampText(parts[3], 12) });
+      const l1 = cleanLabel(parts[2]);
+      const l2 = cleanLabel(parts[3]);
+      if (l1) manualRelations.push({ from, to, label: l1 });
+      if (l2) manualRelations.push({ from: to, to: from, label: l2 });
     } else if (parts[2]) {
-      manualRelations.push({ from, to, label: clampText(parts[2], 12) });
+      const l1 = cleanLabel(parts[2]);
+      if (l1) manualRelations.push({ from, to, label: l1 });
     }
   }
 
