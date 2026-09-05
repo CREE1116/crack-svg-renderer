@@ -1045,116 +1045,164 @@ function renderRelationNode(person, pos, focus) {
 `.trim();
 }
 
-function renderRelationEdges(relations, positions) {
-  return relations.map((rel) => {
+function renderLabelBadge(lx, ly, label, visual) {
+  const text = esc(label);
+  const width = Math.max(54, Math.min(120, text.length * 15 + 24));
+  return `
+<g>
+  <rect
+    x="${lx - width / 2}"
+    y="${ly - 14}"
+    width="${width}"
+    height="28"
+    rx="14"
+    fill="#FFFFFF"
+    stroke="${visual.stroke}"
+    stroke-width="1.8"
+    stroke-opacity=".6"
+  />
+  <text
+    x="${lx}"
+    y="${ly + 5}"
+    text-anchor="middle"
+    fill="#1A1C23"
+    font-family="${FONT_FAMILY}"
+    font-size="12.5"
+    font-weight="700"
+  >${text}</text>
+</g>
+`.trim();
+}
+
+function renderRelationEdges(rawRelations, positions) {
+  // 1) 노드 쌍(Pair) 단위로 그룹화 및 중복 정리
+  const pairMap = new Map();
+
+  for (const rel of rawRelations) {
+    if (!rel.label || !rel.from || !rel.to || rel.from === rel.to) continue;
     const a = positions.get(rel.from);
     const b = positions.get(rel.to);
-    if (!a || !b) return "";
+    if (!a || !b) continue;
 
+    const pairKey = [rel.from, rel.to].sort().join("<->");
+    if (!pairMap.has(pairKey)) {
+      pairMap.set(pairKey, []);
+    }
+    const group = pairMap.get(pairKey);
+    const existingIdx = group.findIndex(r => r.from === rel.from && r.to === rel.to);
+    if (existingIdx !== -1) {
+      group[existingIdx] = rel;
+    } else {
+      group.push(rel);
+    }
+  }
+
+  const output = [];
+
+  for (const group of pairMap.values()) {
+    const rel1 = group[0];
+    const rel2 = group[1]; // 양방향 존재 여부
+
+    const a = positions.get(rel1.from);
+    const b = positions.get(rel1.to);
     const isCenterInvolved = a.isFocus || b.isFocus;
-    const visual = relationVisual(rel.label);
-    const width = Math.max(54, Math.min(110, rel.label.length * 15 + 24));
 
     if (isCenterInvolved) {
-      // 중심-주변 연결: 라벨을 바깥쪽 58% 지점으로 배치하여 중심부 겹침 완전 방지
+      // [중심-외곽 관계선]: 시원하게 중심과 외곽을 직접 잇는 선
       const center = a.isFocus ? a : b;
       const outer = a.isFocus ? b : a;
 
-      const points = shortenLine(center.x, center.y, outer.x, outer.y, center.size / 2 + 10, outer.size / 2 + 12);
+      const points = shortenLine(center.x, center.y, outer.x, outer.y, center.size / 2 + 8, outer.size / 2 + 10);
+      const visual1 = relationVisual(rel1.label);
 
-      const lx = points.x1 + (points.x2 - points.x1) * 0.58;
-      const ly = points.y1 + (points.y2 - points.y1) * 0.58;
+      output.push(`
+<line
+  x1="${points.x1}"
+  y1="${points.y1}"
+  x2="${points.x2}"
+  y2="${points.y2}"
+  stroke="${visual1.stroke}"
+  stroke-width="${visual1.width}"
+  stroke-linecap="round"
+  ${visual1.dash ? `stroke-dasharray="${visual1.dash}"` : ""}
+  opacity="${visual1.opacity}"
+/>
+      `.trim());
 
-      return `
-<g>
-  <line
-    x1="${points.x1}"
-    y1="${points.y1}"
-    x2="${points.x2}"
-    y2="${points.y2}"
-    stroke="${visual.stroke}"
-    stroke-width="${visual.width}"
-    stroke-linecap="round"
-    ${visual.dash ? `stroke-dasharray="${visual.dash}"` : ""}
-    opacity="${visual.opacity}"
-  />
+      if (!rel2) {
+        // 단방향: 58% 외곽 지점
+        const lx = points.x1 + (points.x2 - points.x1) * 0.58;
+        const ly = points.y1 + (points.y2 - points.y1) * 0.58;
+        output.push(renderLabelBadge(lx, ly, rel1.label, visual1));
+      } else {
+        // 양방향: 중심쪽 38%, 외곽쪽 68%로 분리 배치 (절대 안 겹침!)
+        const visual2 = relationVisual(rel2.label);
+        const p1FromCenter = rel1.from === center.id;
 
-  <rect
-    x="${lx - width / 2}"
-    y="${ly - 14}"
-    width="${width}"
-    height="28"
-    rx="14"
-    fill="#FFFFFF"
-    stroke="${visual.stroke}"
-    stroke-width="1.5"
-    stroke-opacity=".5"
-  />
+        const t1 = p1FromCenter ? 0.38 : 0.68;
+        const t2 = p1FromCenter ? 0.68 : 0.38;
 
-  <text
-    x="${lx}"
-    y="${ly + 5}"
-    text-anchor="middle"
-    fill="#202228"
-    font-family="${FONT_FAMILY}"
-    font-size="13"
-    font-weight="700"
-  >${esc(rel.label)}</text>
-</g>
-`.trim();
+        const lx1 = points.x1 + (points.x2 - points.x1) * t1;
+        const ly1 = points.y1 + (points.y2 - points.y1) * t1;
+        const lx2 = points.x1 + (points.x2 - points.x1) * t2;
+        const ly2 = points.y1 + (points.y2 - points.y1) * t2;
+
+        output.push(renderLabelBadge(lx1, ly1, rel1.label, visual1));
+        output.push(renderLabelBadge(lx2, ly2, rel2.label, visual2));
+      }
     } else {
-      // 주변-주변 연결: 중심을 가로지르지 않고 바깥쪽으로 부드럽게 휘어지는 베지어 곡선
-      const points = shortenLine(a.x, a.y, b.x, b.y, a.size / 2 + 10, b.size / 2 + 10);
+      // [외곽-외곽 관계선]: 인물 사이를 가로지르며 드라마틱하게 교차하는 선!
+      const points = shortenLine(a.x, a.y, b.x, b.y, a.size / 2 + 8, b.size / 2 + 8);
+      const visual1 = relationVisual(rel1.label);
+
+      // 중심과의 거리로 텐션(곡률) 조절: 너무 평평하지 않게 부드럽게 얽힘
       const mx = (points.x1 + points.x2) / 2;
       const my = (points.y1 + points.y2) / 2;
-
       const dxCenter = mx - 500;
       const dyCenter = my - 500;
       const distCenter = Math.sqrt(dxCenter * dxCenter + dyCenter * dyCenter) || 1;
-      const bend = 60;
+
+      // 중심을 통과하는 선은 살짝(25px) 휘고, 인접 노드끼리는 바깥으로(45px) 휨
+      const bend = Math.max(20, Math.min(50, 220 - distCenter * 0.45));
       const cx = mx + (dxCenter / distCenter) * bend;
       const cy = my + (dyCenter / distCenter) * bend;
 
-      const lx = 0.25 * points.x1 + 0.5 * cx + 0.25 * points.x2;
-      const ly = 0.25 * points.y1 + 0.5 * cy + 0.25 * points.y2;
+      output.push(`
+<path
+  d="M ${points.x1} ${points.y1} Q ${cx} ${cy}, ${points.x2} ${points.y2}"
+  fill="none"
+  stroke="${visual1.stroke}"
+  stroke-width="${visual1.width}"
+  stroke-linecap="round"
+  ${visual1.dash ? `stroke-dasharray="${visual1.dash}"` : ""}
+  opacity="${visual1.opacity}"
+/>
+      `.trim());
 
-      return `
-<g>
-  <path
-    d="M ${points.x1} ${points.y1} Q ${cx} ${cy}, ${points.x2} ${points.y2}"
-    fill="none"
-    stroke="${visual.stroke}"
-    stroke-width="${visual.width}"
-    stroke-linecap="round"
-    ${visual.dash ? `stroke-dasharray="${visual.dash}"` : ""}
-    opacity="${visual.opacity}"
-  />
+      if (!rel2) {
+        // 단방향: 곡선 중앙 50% 지점
+        const lx = 0.25 * points.x1 + 0.5 * cx + 0.25 * points.x2;
+        const ly = 0.25 * points.y1 + 0.5 * cy + 0.25 * points.y2;
+        output.push(renderLabelBadge(lx, ly, rel1.label, visual1));
+      } else {
+        // 양방향: 곡선 위 34% 지점과 66% 지점에 각각 배치!
+        const visual2 = relationVisual(rel2.label);
 
-  <rect
-    x="${lx - width / 2}"
-    y="${ly - 14}"
-    width="${width}"
-    height="28"
-    rx="14"
-    fill="#FFFFFF"
-    stroke="${visual.stroke}"
-    stroke-width="1.5"
-    stroke-opacity=".5"
-  />
+        const t1 = 0.34;
+        const lx1 = (1 - t1) * (1 - t1) * points.x1 + 2 * (1 - t1) * t1 * cx + t1 * t1 * points.x2;
+        const ly1 = (1 - t1) * (1 - t1) * points.y1 + 2 * (1 - t1) * t1 * cy + t1 * t1 * points.y2;
 
-  <text
-    x="${lx}"
-    y="${ly + 5}"
-    text-anchor="middle"
-    fill="#202228"
-    font-family="${FONT_FAMILY}"
-    font-size="13"
-    font-weight="700"
-  >${esc(rel.label)}</text>
-</g>
-`.trim();
+        const t2 = 0.66;
+        const lx2 = (1 - t2) * (1 - t2) * points.x1 + 2 * (1 - t2) * t2 * cx + t2 * t2 * points.x2;
+        const ly2 = (1 - t2) * (1 - t2) * points.y1 + 2 * (1 - t2) * t2 * cy + t2 * t2 * points.y2;
+
+        output.push(renderLabelBadge(lx1, ly1, rel1.label, visual1));
+        output.push(renderLabelBadge(lx2, ly2, rel2.label, visual2));
+      }
     }
-  }).join("\n");
+  }
+
+  return output.join("\n");
 }
 
 function relationVisual(label) {
